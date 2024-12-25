@@ -52,14 +52,29 @@ def score_and_rank_resumes(input_file: str, output_file: str = "ranked_resumes.c
         for dimension, weight in role.dimension_weights.items():
             # Convert categorical assessments to scores
             score_col = f"{dimension}_score"
-            df[score_col] = df[dimension].map({
+            
+            # Define valid categories
+            score_mapping = {
                 'High': 1.0,
-                'Proficient': 1.0,
                 'Medium': 0.6,
-                'OK': 0.6,
                 'Low': 0.2,
+                'No Signal': 0.0,
+                # Legacy mappings for backward compatibility
+                'Proficient': 1.0,
+                'OK': 0.6,
                 'No signal': 0.0
-            }).fillna(0.0)  # Default to 0 for unknown values
+            }
+            
+            # Check for unexpected categories
+            unique_values = df[dimension].unique()
+            unexpected = [val for val in unique_values if pd.notna(val) and val not in score_mapping]
+            if unexpected:
+                logger.error(f"Unexpected assessment categories in {dimension}: {unexpected}")
+                logger.error(f"Valid categories are: High, Medium, Low, No Signal")
+                return None
+            
+            # Apply scoring
+            df[score_col] = df[dimension].map(score_mapping).fillna(0.0)
             
             # Store raw scores for display (as percentages)
             df[f"{dimension}_display"] = df[score_col] * 100
