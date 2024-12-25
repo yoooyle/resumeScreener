@@ -9,8 +9,6 @@ class RoleRegistry:
     _roles: Dict[str, Type[BaseRole]] = {
         'it_manager': ITManagerRole,
         'software_engineer': SoftwareEngineerRole,
-        # Add more roles here as they are created
-        # 'product_manager': ProductManagerRole,
     }
     
     @classmethod

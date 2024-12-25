@@ -4,7 +4,9 @@ This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract struct
 
 ## Features
 
-- PDF resume text extraction
+- PDF resume text extraction with two engines:
+  - PyMuPDF (default): Optimized extraction with better handling of complex layouts
+  - PyPDF (legacy): Basic extraction for simple PDFs
 - Structured analysis using GPT-4o
 - Role-specific analysis dimensions and scoring
 - Detailed evidence-based assessments
@@ -67,11 +69,20 @@ OPENAI_API_KEY=your_api_key_here
 
 1. Process a single resume:
 ```bash
-# Basic usage (defaults to IT Manager role)
+# Basic usage (defaults to IT Manager role and optimized PDF extraction)
 python resume_analysis_core.py path/to/resume.pdf
 
 # Specify role
 python resume_analysis_core.py path/to/resume.pdf -r software_engineer
+
+# Use legacy PDF extraction
+python resume_analysis_core.py path/to/resume.pdf --legacy-pdf
+
+# Control logging verbosity
+python resume_analysis_core.py path/to/resume.pdf --log-level DEBUG  # Full debug output
+python resume_analysis_core.py path/to/resume.pdf -v                 # Verbose (same as DEBUG)
+python resume_analysis_core.py path/to/resume.pdf -q                 # Quiet (ERROR level only)
+python resume_analysis_core.py path/to/resume.pdf -l WARNING        # Custom level
 ```
 
 2. Process a directory of resumes (analysis only):
@@ -79,8 +90,8 @@ python resume_analysis_core.py path/to/resume.pdf -r software_engineer
 # Basic usage
 python resume_analyzer.py /path/to/resume/directory
 
-# Specify role and output file
-python resume_analyzer.py /path/to/resume/directory -r software_engineer -o custom_output.csv
+# Specify role, output file, and use legacy PDF extraction
+python resume_analyzer.py /path/to/resume/directory -r software_engineer -o custom_output.csv --legacy-pdf
 ```
 
 3. Score and rank analyzed resumes:
@@ -117,11 +128,28 @@ By default, the script will reuse existing output files if they exist, making it
 ```python
 # Process a single resume
 from resume_analysis_core import process_resume
-result = process_resume("path/to/resume.pdf", role="software_engineer")
+
+# Default settings (IT Manager role, optimized PDF extraction)
+result = process_resume("path/to/resume.pdf")
+
+# Specify role and PDF extraction method
+result = process_resume(
+    "path/to/resume.pdf",
+    role="software_engineer",
+    use_optimized_pdf=True  # Set to False for legacy extraction
+)
 
 # Process multiple resumes
 from resume_analyzer import ResumeProcessor
-processor = ResumeProcessor(role="software_engineer")
+
+# Default settings
+processor = ResumeProcessor()
+
+# Specify role and PDF extraction method
+processor = ResumeProcessor(
+    role="software_engineer",
+    use_optimized_pdf=True  # Set to False for legacy extraction
+)
 processor.process_directory("/path/to/resume/directory")
 
 # Process and rank resumes
@@ -130,7 +158,8 @@ process_and_rank(
     "/path/to/resume/directory",
     role="software_engineer",
     output_prefix="custom_name",
-    force_rerun=False
+    force_rerun=False,
+    use_optimized_pdf=True  # Set to False for legacy extraction
 )
 ```
 

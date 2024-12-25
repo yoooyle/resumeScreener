@@ -1,118 +1,114 @@
 import os
 import sys
 import logging
+from pathlib import Path
+from typing import Optional
 from resume_analyzer import ResumeProcessor
 from resume_scorer import score_resumes
 from roles import RoleRegistry
 import logging_config
 import pandas as pd
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 def process_and_rank(
-    directory_path: str, 
-    role: str = 'it_manager',
+    resume_dir: str,
+    role: str = "it_manager",
     output_prefix: str = "resume",
-    force_rerun: bool = False
-) -> Optional[pd.DataFrame]:
+    force_rerun: bool = False,
+    use_optimized_pdf: bool = True
+) -> tuple[str, str, Optional[pd.DataFrame]]:
     """
-    Process a directory of resumes and produce ranked results.
-    Skips steps if output files exist, unless force_rerun is True.
+    Process all resumes in a directory and generate ranked results.
     
     Args:
-        directory_path: Path to directory containing PDF resumes
-        role: Role to analyze for (default: 'it_manager')
+        resume_dir: Directory containing resume PDFs
+        role: Role to analyze for (default: "it_manager")
         output_prefix: Prefix for output files (default: "resume")
-                      Will produce <prefix>_analysis.csv and <prefix>_ranked.csv
-        force_rerun: If True, rerun all steps even if outputs exist
+        force_rerun: Whether to force rerun analysis even if output exists
+        use_optimized_pdf: Whether to use PyMuPDF for optimized PDF extraction
     
     Returns:
-        DataFrame with ranked results if successful, None if error occurs
+        Tuple of (analysis_csv_path, ranked_csv_path, ranked_df)
+        ranked_df will be None if there's an error or no results
     """
-    # Set up output file paths
-    analysis_file = f"{output_prefix}_analysis.csv"
-    ranked_file = f"{output_prefix}_ranked.csv"
+    analysis_csv = f"{output_prefix}_analysis.csv"
+    ranked_csv = f"{output_prefix}_ranked.csv"
     
     try:
-        # Step 1: Analyze resumes
-        if force_rerun or not os.path.exists(analysis_file):
-            logger.info("Step 1: Analyzing resumes...")
-            processor = ResumeProcessor(role)
-            processor.process_directory(directory_path, analysis_file)
+        # Check if we need to run analysis
+        if force_rerun or not os.path.exists(analysis_csv):
+            logger.info("Running resume analysis...")
+            processor = ResumeProcessor(role=role, use_optimized_pdf=use_optimized_pdf)
+            processor.process_directory(resume_dir, output_file=analysis_csv)
         else:
-            logger.info(f"Using existing analysis file: {analysis_file}")
-            if not os.path.getsize(analysis_file):
-                logger.error(f"Existing analysis file is empty: {analysis_file}")
-                return None
+            logger.info(f"Using existing analysis file: {analysis_csv}")
+            if not os.path.getsize(analysis_csv):
+                logger.error(f"Existing analysis file is empty: {analysis_csv}")
+                return analysis_csv, ranked_csv, None
         
-        # Step 2: Score and rank results
-        if force_rerun or not os.path.exists(ranked_file):
-            logger.info("Step 2: Scoring and ranking candidates...")
-            df = score_resumes(analysis_file, ranked_file)
+        # Check if we need to run ranking
+        if force_rerun or not os.path.exists(ranked_csv):
+            logger.info("Generating ranked results...")
+            df = score_resumes(analysis_csv, ranked_csv)
         else:
-            logger.info(f"Using existing ranked file: {ranked_file}")
-            if not os.path.getsize(ranked_file):
-                logger.error(f"Existing ranked file is empty: {ranked_file}")
-                return None
-            df = pd.read_csv(ranked_file)
+            logger.info(f"Using existing ranked file: {ranked_csv}")
+            if not os.path.getsize(ranked_csv):
+                logger.error(f"Existing ranked file is empty: {ranked_csv}")
+                return analysis_csv, ranked_csv, None
+            df = pd.read_csv(ranked_csv)
         
-        logger.info(f"Analysis complete. Results available in:")
-        logger.info(f"- Raw analysis: {analysis_file}")
-        logger.info(f"- Ranked results: {ranked_file}")
-        
-        # Print top 5 summary
-        print("\nTop 5 Candidates Summary:")
-        print("=" * 50)
-        top_5 = df.head().to_dict('records')
-        
-        for row in top_5:
-            print(f"\nRank {int(row['rank'])} - Score: {float(row['total_score']):.2f}")
-            print(f"File: {row['resume_file']}")
-            print(f"Name: {str(row['chinese_name'])}")
-            if pd.notna(row['highlights']):
-                print(f"Key Strengths: {str(row['highlights'])}")
-            if pd.notna(row['risks']):
-                print(f"Risks: {str(row['risks'])}")
-            
-            # Print dimension scores
-            print("\nDimension Scores:")
-            for col in row.keys():
-                if col.endswith('_score') and col != 'total_score':
-                    score = float(row[col])
-                    print(f"- {col.replace('_score', '').replace('_', ' ').title()}: {score:.2f}")
-        
-        return df
+        return analysis_csv, ranked_csv, df
         
     except Exception as e:
-        logger.error(f"Error processing directory: {str(e)}", exc_info=True)
-        return None
+        logger.error(f"Error in analysis pipeline: {str(e)}", exc_info=True)
+        return analysis_csv, ranked_csv, None
 
 def main():
-    """Command-line interface for combined analysis and ranking."""
+    """Command-line interface for the complete analysis pipeline."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Analyze and rank resumes from a directory")
-    parser.add_argument("directory_path", help="Path to directory containing PDF resumes")
+    parser = argparse.ArgumentParser(description="Analyze and rank resumes for a specific role")
+    parser.add_argument("resume_dir", help="Directory containing resume PDFs")
     parser.add_argument("--role", "-r", default="it_manager",
                        help=f"Role to analyze for. Available roles: {', '.join(RoleRegistry.available_roles())}")
-    parser.add_argument("--force", "-f", action="store_true", 
-                       help="Force rerun all steps even if outputs exist")
     parser.add_argument("--prefix", "-p", default="resume",
-                       help="Prefix for output files (default: 'resume')")
+                       help="Prefix for output files (default: resume)")
+    parser.add_argument("--force", "-f", action="store_true",
+                       help="Force rerun all steps even if output files exist")
+    parser.add_argument("--legacy-pdf", action="store_true",
+                       help="Use legacy PDF extraction (PyPDF) instead of optimized PyMuPDF")
+    parser.add_argument("--log-level", "-l", default="INFO",
+                       choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                       help="Set the logging level (default: INFO)")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                       help="Shortcut for --log-level DEBUG")
+    parser.add_argument("--quiet", "-q", action="store_true",
+                       help="Shortcut for --log-level ERROR")
     
     args = parser.parse_args()
     
+    # Set logging level
+    if args.verbose:
+        log_level = "DEBUG"
+    elif args.quiet:
+        log_level = "ERROR"
+    else:
+        log_level = args.log_level
+    
+    logging_config.set_log_level(getattr(logging, log_level))
+    
+    # Validate inputs
     if not os.getenv("OPENAI_API_KEY"):
         logger.error("OPENAI_API_KEY environment variable is not set")
         sys.exit(1)
 
-    if not os.path.exists(args.directory_path):
-        logger.error(f"Directory does not exist: {args.directory_path}")
+    if not os.path.exists(args.resume_dir):
+        logger.error(f"Directory does not exist: {args.resume_dir}")
         sys.exit(1)
 
-    if not os.path.isdir(args.directory_path):
-        logger.error(f"Path is not a directory: {args.directory_path}")
+    if not os.path.isdir(args.resume_dir):
+        logger.error(f"Path is not a directory: {args.resume_dir}")
         sys.exit(1)
     
     # Validate role
@@ -122,17 +118,44 @@ def main():
         logger.error(str(e))
         sys.exit(1)
     
-    result = process_and_rank(
-        args.directory_path,
-        role=args.role,
-        output_prefix=args.prefix,
-        force_rerun=args.force
-    )
+    try:
+        analysis_csv, ranked_csv, df = process_and_rank(
+            args.resume_dir,
+            role=args.role,
+            output_prefix=args.prefix,
+            force_rerun=args.force,
+            use_optimized_pdf=not args.legacy_pdf
+        )
+        
+        print(f"\nAnalysis complete!")
+        print(f"Analysis results: {analysis_csv}")
+        print(f"Ranked results: {ranked_csv}")
+        
+        if df is not None and not df.empty:
+            # Print top 5 summary
+            print("\nTop 5 Candidates Summary:")
+            print("=" * 50)
+            top_5 = df.head().to_dict('records')
+            
+            for row in top_5:
+                print(f"\nRank {int(row['rank'])} - Score: {float(row['total_score']):.2f}")
+                print(f"File: {row['resume_file']}")
+                print(f"Name: {str(row['chinese_name'])}")
+                if pd.notna(row['highlights']):
+                    print(f"Key Strengths: {str(row['highlights'])}")
+                if pd.notna(row['risks']):
+                    print(f"Risks: {str(row['risks'])}")
+                
+                # Print dimension scores
+                print("\nDimension Scores:")
+                for col in row.keys():
+                    if col.endswith('_score') and col != 'total_score':
+                        score = float(row[col])
+                        print(f"- {col.replace('_score', '').replace('_', ' ').title()}: {score:.2f}")
     
-    if result is None:
+    except Exception as e:
+        logger.error(f"Error in analysis pipeline: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
-    # Set up logging
-    logging_config.set_log_level(logging.INFO)
     main() 

@@ -1,4 +1,4 @@
-You are an expert recruiter for IT positions. You are given a resume and a job description. 
+You are an expert recruiter for positions. You are given a resume and a job description. 
 
 You should review it and extract into structured data. 
 Focus on extracting each dimension above accurately and faithfully. 

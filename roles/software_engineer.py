@@ -11,6 +11,7 @@ class SoftwareEngineerRole(BaseRole):
     def prompt_template(self) -> str:
         return """You are an expert resume analyzer for Software Engineer positions. 
         Analyze the resume text and extract key information about the candidate's qualifications.
+        Focus on technical skills, coding proficiency, system design capabilities, and engineering practices.
         
         For each dimension, provide specific evidence from the resume that supports your assessment.
         Be objective and thorough in your analysis.
