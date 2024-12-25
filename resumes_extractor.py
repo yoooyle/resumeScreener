@@ -3,15 +3,20 @@ import sys
 import logging
 from pathlib import Path
 from typing import Optional
-from resume_analysis_core import ResumeAnalyzer
+from ai_resume_extractor import AIResumeExtractor
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-class ResumeProcessor:
+class ResumesExtractor:
+    """
+    Batch processor for extracting dimensions from multiple resumes.
+    This class handles the directory traversal and batch processing of resume PDFs.
+    """
+    
     def __init__(self, role: str = "it_manager", use_optimized_pdf: bool = True):
         """
-        Initialize the resume processor.
+        Initialize the resumes extractor.
         
         Args:
             role: Role to analyze for (default: "it_manager")
@@ -19,18 +24,18 @@ class ResumeProcessor:
         """
         self.role = role
         self.use_optimized_pdf = use_optimized_pdf
-        self.analyzer = ResumeAnalyzer(role=role, use_optimized_pdf=use_optimized_pdf)
+        self.extractor = AIResumeExtractor(role=role, use_optimized_pdf=use_optimized_pdf)
     
-    def process_directory(self, directory_path: str, output_file: str = "resume_analysis.csv") -> Optional[pd.DataFrame]:
+    def extract_from_directory(self, directory_path: str, output_file: str = "extracted_dimensions.csv") -> Optional[pd.DataFrame]:
         """
-        Process all PDF resumes in a directory and save results to CSV.
+        Extract dimensions from all PDF resumes in a directory and save results to CSV.
         
         Args:
             directory_path: Path to directory containing PDF resumes
-            output_file: Path to output CSV file (default: resume_analysis.csv)
+            output_file: Path to output CSV file (default: extracted_dimensions.csv)
         
         Returns:
-            DataFrame with analysis results if successful, None if error occurs
+            DataFrame with extracted dimensions if successful, None if error occurs
         """
         try:
             # Get list of PDF files
@@ -47,7 +52,7 @@ class ResumeProcessor:
                 pdf_path = os.path.join(directory_path, pdf_file)
                 try:
                     logger.info(f"Processing {pdf_file}...")
-                    result = self.analyzer.analyze_resume_file(pdf_path)
+                    result = self.extractor.extract_from_pdf(pdf_path)
                     result_dict = result.dict()
                     result_dict['resume_file'] = pdf_file
                     results.append(result_dict)
@@ -67,7 +72,7 @@ class ResumeProcessor:
             df = df[cols]
             
             df.to_csv(output_file, index=False)
-            logger.info(f"Analysis complete. Results saved to {output_file}")
+            logger.info(f"Extraction complete. Results saved to {output_file}")
             return df
             
         except Exception as e:
@@ -75,15 +80,15 @@ class ResumeProcessor:
             return None
 
 def main():
-    """Command-line interface for batch resume processing."""
+    """Command-line interface for batch resume dimension extraction."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Process multiple resumes from a directory")
+    parser = argparse.ArgumentParser(description="Extract dimensions from multiple resumes in a directory")
     parser.add_argument("directory_path", help="Path to directory containing PDF resumes")
     parser.add_argument("--role", "-r", default="it_manager",
                        help="Role to analyze for (default: it_manager)")
-    parser.add_argument("--output", "-o", default="resume_analysis.csv",
-                       help="Output CSV file path (default: resume_analysis.csv)")
+    parser.add_argument("--output", "-o", default="extracted_dimensions.csv",
+                       help="Output CSV file path (default: extracted_dimensions.csv)")
     parser.add_argument("--legacy-pdf", action="store_true",
                        help="Use legacy PDF extraction (PyPDF) instead of optimized PyMuPDF")
     
@@ -97,8 +102,8 @@ def main():
         logger.error(f"Path is not a directory: {args.directory_path}")
         sys.exit(1)
     
-    processor = ResumeProcessor(role=args.role, use_optimized_pdf=not args.legacy_pdf)
-    result = processor.process_directory(args.directory_path, args.output)
+    extractor = ResumesExtractor(role=args.role, use_optimized_pdf=not args.legacy_pdf)
+    result = extractor.extract_from_directory(args.directory_path, args.output)
     
     if result is None:
         sys.exit(1)

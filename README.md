@@ -1,14 +1,14 @@
 # Resume Fact Extractor
 
-This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract structured information about candidates, scores them based on role-specific dimensions, and provides ranked results.
+This Python program extracts structured information from PDF resumes using OpenAI's GPT-4o, scores them based on role-specific dimensions, and provides ranked results.
 
 ## Features
 
 - PDF resume text extraction with two engines:
   - PyMuPDF (default): Optimized extraction with better handling of complex layouts
   - PyPDF (legacy): Basic extraction for simple PDFs
-- Structured analysis using GPT-4o
-- Role-specific analysis dimensions and scoring
+- Structured dimension extraction using GPT-4o
+- Role-specific dimensions and scoring
 - Detailed evidence-based assessments
 - One-row-per-resume CSV output with paired assessment-evidence columns
 - Automated scoring and ranking system
@@ -67,43 +67,43 @@ OPENAI_API_KEY=your_api_key_here
 
 ### Command Line Interface
 
-1. Process a single resume:
+1. Extract dimensions from a single resume:
 ```bash
 # Basic usage (defaults to IT Manager role and optimized PDF extraction)
-python resume_analysis_core.py path/to/resume.pdf
+python ai_resume_extractor.py path/to/resume.pdf
 
 # Specify role
-python resume_analysis_core.py path/to/resume.pdf -r software_engineer
+python ai_resume_extractor.py path/to/resume.pdf -r software_engineer
 
 # Use legacy PDF extraction
-python resume_analysis_core.py path/to/resume.pdf --legacy-pdf
+python ai_resume_extractor.py path/to/resume.pdf --legacy-pdf
 
 # Control logging verbosity
-python resume_analysis_core.py path/to/resume.pdf --log-level DEBUG  # Full debug output
-python resume_analysis_core.py path/to/resume.pdf -v                 # Verbose (same as DEBUG)
-python resume_analysis_core.py path/to/resume.pdf -q                 # Quiet (ERROR level only)
-python resume_analysis_core.py path/to/resume.pdf -l WARNING        # Custom level
+python ai_resume_extractor.py path/to/resume.pdf --log-level DEBUG  # Full debug output
+python ai_resume_extractor.py path/to/resume.pdf -v                 # Verbose (same as DEBUG)
+python ai_resume_extractor.py path/to/resume.pdf -q                 # Quiet (ERROR level only)
+python ai_resume_extractor.py path/to/resume.pdf -l WARNING        # Custom level
 ```
 
-2. Process a directory of resumes (analysis only):
+2. Extract dimensions from multiple resumes:
 ```bash
 # Basic usage
-python resume_analyzer.py /path/to/resume/directory
+python resumes_extractor.py /path/to/resume/directory
 
-# Specify role, output file, and use legacy PDF extraction
-python resume_analyzer.py /path/to/resume/directory -r software_engineer -o custom_output.csv --legacy-pdf
+# Specify role and output file
+python resumes_extractor.py /path/to/resume/directory -r software_engineer -o custom_dimensions.csv --legacy-pdf
 ```
 
-3. Score and rank analyzed resumes:
+3. Score and rank extracted dimensions:
 ```bash
 # Basic usage
-python resume_scorer.py resume_analysis.csv
+python resumes_ranker.py extracted_dimensions.csv
 
 # Specify output file
-python resume_scorer.py resume_analysis.csv -o ranked_results.csv
+python resumes_ranker.py extracted_dimensions.csv -o ranked_results.csv
 ```
 
-4. Complete pipeline (analyze and rank in one step):
+4. Complete pipeline (extract and rank in one step):
 ```bash
 # Basic usage
 python analyze_and_rank.py /path/to/resume/directory
@@ -113,48 +113,59 @@ python analyze_and_rank.py -r software_engineer -p custom_prefix /path/to/resume
 
 # Force rerun all steps
 python analyze_and_rank.py -f /path/to/resume/directory
+
+# Control logging verbosity
+python analyze_and_rank.py /path/to/resume/directory -v  # Verbose output
 ```
 
 The analyze_and_rank.py script supports the following options:
 - `-r, --role`: Role to analyze for (default: "it_manager")
 - `-f, --force`: Force rerun all steps even if output files exist
 - `-p PREFIX, --prefix PREFIX`: Custom prefix for output files (default: "resume")
-  - Creates PREFIX_analysis.csv and PREFIX_ranked.csv
+  - Creates PREFIX_extracted.csv and PREFIX_ranked.csv
+- `-v, --verbose`: Enable debug logging
+- `-q, --quiet`: Only show error messages
+- `-l LEVEL, --log-level LEVEL`: Set specific logging level
+- `--legacy-pdf`: Use PyPDF instead of PyMuPDF for extraction
 
 By default, the script will reuse existing output files if they exist, making it efficient for iterative analysis.
 
 ### Python API
 
 ```python
-# Process a single resume
-from resume_analysis_core import process_resume
+# Extract dimensions from a single resume
+from ai_resume_extractor import extract_resume
 
 # Default settings (IT Manager role, optimized PDF extraction)
-result = process_resume("path/to/resume.pdf")
+result = extract_resume("path/to/resume.pdf")
 
 # Specify role and PDF extraction method
-result = process_resume(
+result = extract_resume(
     "path/to/resume.pdf",
     role="software_engineer",
     use_optimized_pdf=True  # Set to False for legacy extraction
 )
 
-# Process multiple resumes
-from resume_analyzer import ResumeProcessor
+# Extract dimensions from multiple resumes
+from resumes_extractor import ResumesExtractor
 
 # Default settings
-processor = ResumeProcessor()
+extractor = ResumesExtractor()
 
 # Specify role and PDF extraction method
-processor = ResumeProcessor(
+extractor = ResumesExtractor(
     role="software_engineer",
     use_optimized_pdf=True  # Set to False for legacy extraction
 )
-processor.process_directory("/path/to/resume/directory")
+df = extractor.extract_from_directory("/path/to/resume/directory")
 
-# Process and rank resumes
-from analyze_and_rank import process_and_rank
-process_and_rank(
+# Score and rank resumes
+from resumes_ranker import score_and_rank_resumes
+df = score_and_rank_resumes("extracted_dimensions.csv", "ranked_results.csv")
+
+# Complete pipeline
+from analyze_and_rank import extract_and_rank
+extracted_csv, ranked_csv, df = extract_and_rank(
     "/path/to/resume/directory",
     role="software_engineer",
     output_prefix="custom_name",
@@ -176,7 +187,7 @@ logging_config.set_log_level(logging.INFO)   # For normal operation
 
 ## Output Format
 
-### Initial Analysis CSV
+### Initial Extraction CSV
 The first-stage output uses a one-row-per-resume format with assessment and evidence columns paired together. The exact columns depend on the role selected, but follow this pattern:
 
 ```csv
@@ -191,7 +202,7 @@ risks, highlights
 The second-stage output adds scoring columns and ranks candidates:
 
 ```csv
-rank, total_score, dimension1_score, dimension2_score, ..., [all columns from initial analysis]
+rank, total_score, dimension1_score, dimension2_score, ..., [all columns from initial extraction]
 ```
 
 ## Adding New Roles
@@ -249,10 +260,10 @@ __all__ = [..., 'NewRole']
 
 ## Project Structure
 
-- `resume_analyzer.py`: Main script for batch processing directories
-- `resume_analysis_core.py`: Core analysis functionality and models
-- `resume_scorer.py`: Scoring and ranking system
-- `analyze_and_rank.py`: Combined analysis and ranking pipeline
+- `ai_resume_extractor.py`: Core AI-based dimension extraction from single resumes
+- `resumes_extractor.py`: Batch processing of multiple resumes
+- `resumes_ranker.py`: Scoring and ranking system
+- `analyze_and_rank.py`: Combined extraction and ranking pipeline
 - `roles/`: Role-specific configurations
   - `base_role.py`: Base role interface
   - `it_manager.py`: IT Manager role configuration

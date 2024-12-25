@@ -21,10 +21,15 @@ if not os.getenv("OPENAI_API_KEY"):
 # Create logger for this module
 logger = logging.getLogger(__name__)
 
-class ResumeAnalyzer:
+class AIResumeExtractor:
+    """
+    Extracts structured information from a single resume using AI (GPT-4).
+    This class handles the PDF text extraction and AI-based analysis of individual resumes.
+    """
+    
     def __init__(self, role: Union[str, BaseRole], api_key: Optional[str] = None, use_optimized_pdf: bool = True):
         """
-        Initialize the resume analyzer for a specific role.
+        Initialize the AI resume extractor.
         
         Args:
             role: Either a role name string or a BaseRole instance
@@ -45,7 +50,7 @@ class ResumeAnalyzer:
         # Create the analysis model for this role
         self.AnalysisModel = self.role.create_analysis_model()
         
-        logger.debug(f"ResumeAnalyzer initialized for role: {self.role.role_name}")
+        logger.debug(f"AIResumeExtractor initialized for role: {self.role.role_name}")
 
     def extract_text_from_pdf_pypdf(self, pdf_path: Union[str, Path]) -> str:
         """Extract text content from a PDF file using PyPDF."""
@@ -92,9 +97,17 @@ class ResumeAnalyzer:
             return self.extract_text_from_pdf_mupdf(pdf_path)
         return self.extract_text_from_pdf_pypdf(pdf_path)
 
-    def analyze_resume_text(self, resume_text: str) -> BaseModel:
-        """Analyze a single resume text and return structured results."""
-        logger.debug("Starting resume text analysis")
+    def extract_dimensions(self, resume_text: str) -> BaseModel:
+        """
+        Extract key dimensions from resume text using AI analysis.
+        
+        Args:
+            resume_text: The text content of the resume
+            
+        Returns:
+            A Pydantic model containing the extracted dimensions and evidence
+        """
+        logger.debug("Starting AI dimension extraction")
         completion = self.client.beta.chat.completions.parse(
             model="gpt-4o",
             messages=[
@@ -103,19 +116,27 @@ class ResumeAnalyzer:
             ],
             response_format=self.AnalysisModel
         )
-        logger.debug("Resume analysis completed")
+        logger.debug("Dimension extraction completed")
         return completion.choices[0].message.parsed
 
-    def analyze_resume_file(self, file_path: Union[str, Path]) -> BaseModel:
-        """Analyze a resume file (PDF) and return structured results."""
-        logger.info(f"Analyzing resume file: {file_path}")
+    def extract_from_pdf(self, file_path: Union[str, Path]) -> BaseModel:
+        """
+        Extract dimensions from a resume PDF file.
+        
+        Args:
+            file_path: Path to the resume PDF file
+            
+        Returns:
+            A Pydantic model containing the extracted dimensions and evidence
+        """
+        logger.info(f"Extracting dimensions from resume: {file_path}")
         text = self.extract_text_from_pdf(file_path)
-        logger.debug("Extracted text from PDF, proceeding with analysis")
-        return self.analyze_resume_text(text)
+        logger.debug("Extracted text from PDF, proceeding with dimension extraction")
+        return self.extract_dimensions(text)
 
-def process_resume(file_path: str, role: Union[str, BaseRole] = 'it_manager', use_optimized_pdf: bool = True) -> dict:
+def extract_resume(file_path: str, role: Union[str, BaseRole] = 'it_manager', use_optimized_pdf: bool = True) -> dict:
     """
-    Process a single resume file and return analysis results.
+    Extract dimensions from a single resume file.
     
     Args:
         file_path: Path to the resume PDF file
@@ -123,17 +144,17 @@ def process_resume(file_path: str, role: Union[str, BaseRole] = 'it_manager', us
         use_optimized_pdf: Whether to use PyMuPDF for optimized PDF extraction (default: True)
     
     Returns:
-        Dictionary containing the analysis results
+        Dictionary containing the extracted dimensions and evidence
     """
-    analyzer = ResumeAnalyzer(role, use_optimized_pdf=use_optimized_pdf)
-    result = analyzer.analyze_resume_file(file_path)
+    extractor = AIResumeExtractor(role, use_optimized_pdf=use_optimized_pdf)
+    result = extractor.extract_from_pdf(file_path)
     return result.dict()
 
 def main():
-    """Command-line interface for resume analysis."""
+    """Command-line interface for single resume extraction."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Analyze a resume for a specific role")
+    parser = argparse.ArgumentParser(description="Extract dimensions from a resume for a specific role")
     parser.add_argument("resume_file", help="Path to the resume PDF file")
     parser.add_argument("--role", "-r", default="it_manager",
                        help=f"Role to analyze for. Available roles: {', '.join(RoleRegistry.available_roles())}")
@@ -160,14 +181,14 @@ def main():
     logging_config.set_log_level(getattr(logging, log_level))
     
     try:
-        result = process_resume(
+        result = extract_resume(
             args.resume_file,
             args.role,
             use_optimized_pdf=not args.legacy_pdf
         )
         
         # Print results in a readable format
-        print("\nResume Analysis Results:")
+        print("\nExtracted Dimensions:")
         print("=" * 50)
         for field, value in result.items():
             if not field.endswith('_evidence'):
@@ -179,7 +200,7 @@ def main():
                     print(f"Evidence: {evidence}")
     
     except Exception as e:
-        logger.error(f"Error analyzing resume: {str(e)}", exc_info=True)
+        logger.error(f"Error extracting dimensions: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

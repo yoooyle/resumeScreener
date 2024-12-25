@@ -3,15 +3,15 @@ import sys
 import logging
 from pathlib import Path
 from typing import Optional
-from resume_analyzer import ResumeProcessor
-from resume_scorer import score_resumes
+from resumes_extractor import ResumesExtractor
+from resumes_ranker import score_and_rank_resumes
 from roles import RoleRegistry
 import logging_config
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-def process_and_rank(
+def extract_and_rank(
     resume_dir: str,
     role: str = "it_manager",
     output_prefix: str = "resume",
@@ -19,56 +19,56 @@ def process_and_rank(
     use_optimized_pdf: bool = True
 ) -> tuple[str, str, Optional[pd.DataFrame]]:
     """
-    Process all resumes in a directory and generate ranked results.
+    Extract dimensions from resumes and generate ranked results.
     
     Args:
         resume_dir: Directory containing resume PDFs
         role: Role to analyze for (default: "it_manager")
         output_prefix: Prefix for output files (default: "resume")
-        force_rerun: Whether to force rerun analysis even if output exists
+        force_rerun: Whether to force rerun extraction even if output exists
         use_optimized_pdf: Whether to use PyMuPDF for optimized PDF extraction
     
     Returns:
-        Tuple of (analysis_csv_path, ranked_csv_path, ranked_df)
+        Tuple of (extracted_csv_path, ranked_csv_path, ranked_df)
         ranked_df will be None if there's an error or no results
     """
-    analysis_csv = f"{output_prefix}_analysis.csv"
+    extracted_csv = f"{output_prefix}_extracted.csv"
     ranked_csv = f"{output_prefix}_ranked.csv"
     
     try:
-        # Check if we need to run analysis
-        if force_rerun or not os.path.exists(analysis_csv):
-            logger.info("Running resume analysis...")
-            processor = ResumeProcessor(role=role, use_optimized_pdf=use_optimized_pdf)
-            processor.process_directory(resume_dir, output_file=analysis_csv)
+        # Check if we need to run extraction
+        if force_rerun or not os.path.exists(extracted_csv):
+            logger.info("Running dimension extraction...")
+            extractor = ResumesExtractor(role=role, use_optimized_pdf=use_optimized_pdf)
+            extractor.extract_from_directory(resume_dir, output_file=extracted_csv)
         else:
-            logger.info(f"Using existing analysis file: {analysis_csv}")
-            if not os.path.getsize(analysis_csv):
-                logger.error(f"Existing analysis file is empty: {analysis_csv}")
-                return analysis_csv, ranked_csv, None
+            logger.info(f"Using existing extracted dimensions: {extracted_csv}")
+            if not os.path.getsize(extracted_csv):
+                logger.error(f"Existing extracted file is empty: {extracted_csv}")
+                return extracted_csv, ranked_csv, None
         
         # Check if we need to run ranking
         if force_rerun or not os.path.exists(ranked_csv):
             logger.info("Generating ranked results...")
-            df = score_resumes(analysis_csv, ranked_csv)
+            df = score_and_rank_resumes(extracted_csv, ranked_csv)
         else:
             logger.info(f"Using existing ranked file: {ranked_csv}")
             if not os.path.getsize(ranked_csv):
                 logger.error(f"Existing ranked file is empty: {ranked_csv}")
-                return analysis_csv, ranked_csv, None
+                return extracted_csv, ranked_csv, None
             df = pd.read_csv(ranked_csv)
         
-        return analysis_csv, ranked_csv, df
+        return extracted_csv, ranked_csv, df
         
     except Exception as e:
-        logger.error(f"Error in analysis pipeline: {str(e)}", exc_info=True)
-        return analysis_csv, ranked_csv, None
+        logger.error(f"Error in extraction pipeline: {str(e)}", exc_info=True)
+        return extracted_csv, ranked_csv, None
 
 def main():
-    """Command-line interface for the complete analysis pipeline."""
+    """Command-line interface for the complete extraction and ranking pipeline."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Analyze and rank resumes for a specific role")
+    parser = argparse.ArgumentParser(description="Extract dimensions from resumes and rank them for a specific role")
     parser.add_argument("resume_dir", help="Directory containing resume PDFs")
     parser.add_argument("--role", "-r", default="it_manager",
                        help=f"Role to analyze for. Available roles: {', '.join(RoleRegistry.available_roles())}")
@@ -119,7 +119,7 @@ def main():
         sys.exit(1)
     
     try:
-        analysis_csv, ranked_csv, df = process_and_rank(
+        extracted_csv, ranked_csv, df = extract_and_rank(
             args.resume_dir,
             role=args.role,
             output_prefix=args.prefix,
@@ -127,8 +127,8 @@ def main():
             use_optimized_pdf=not args.legacy_pdf
         )
         
-        print(f"\nAnalysis complete!")
-        print(f"Analysis results: {analysis_csv}")
+        print(f"\nExtraction and ranking complete!")
+        print(f"Extracted dimensions: {extracted_csv}")
         print(f"Ranked results: {ranked_csv}")
         
         if df is not None and not df.empty:
@@ -150,11 +150,11 @@ def main():
                 print("\nDimension Scores:")
                 for col in row.keys():
                     if col.endswith('_score') and col != 'total_score':
-                        score = float(row[col])
-                        print(f"- {col.replace('_score', '').replace('_', ' ').title()}: {score:.2f}")
+                        score = float(row[col]) * 100
+                        print(f"- {col.replace('_score', '').replace('_', ' ').title()}: {score:.1f}%")
     
     except Exception as e:
-        logger.error(f"Error in analysis pipeline: {str(e)}", exc_info=True)
+        logger.error(f"Error in extraction pipeline: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
