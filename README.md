@@ -54,8 +54,22 @@ python resume_scorer.py resume_analysis.csv
 
 4. Complete pipeline (analyze and rank in one step):
 ```bash
+# Basic usage
 python analyze_and_rank.py /path/to/resume/directory
+
+# Force rerun all steps even if outputs exist
+python analyze_and_rank.py -f /path/to/resume/directory
+
+# Custom output file prefix (default: "resume")
+python analyze_and_rank.py -p custom_prefix /path/to/resume/directory
 ```
+
+The analyze_and_rank.py script supports the following options:
+- `-f, --force`: Force rerun all steps even if output files exist
+- `-p PREFIX, --prefix PREFIX`: Custom prefix for output files (default: "resume")
+  - Creates PREFIX_analysis.csv and PREFIX_ranked.csv
+
+By default, the script will reuse existing output files if they exist, making it efficient for iterative analysis.
 
 ### Python API
 
