@@ -6,7 +6,7 @@ import glob
 import logging
 from resume_analysis_core import ResumeAnalyzer, ResumeAnalysisResult
 import logging_config
-from field_config import FIELD_PAIRS, ASSESSMENT_FIELDS, EVIDENCE_FIELDS
+from field_config import FIELD_PAIRS, get_ordered_columns
 
 # Load environment variables
 load_dotenv()
@@ -22,20 +22,18 @@ class ResumeProcessor:
         """Convert analysis result to a dictionary for CSV output.
         
         Returns a flat dictionary with:
-        - One column per dimension (assessment)
-        - One column per evidence field (at the end)
+        - One column per dimension
+        - Evidence field next to its corresponding assessment
         """
         # Start with the resume file name
         result = {'resume_file': resume_file}
         data = analysis.model_dump()
         
-        # Add all assessment fields first
-        for field in ASSESSMENT_FIELDS:
+        # Add all fields in order
+        for field, evidence_field in FIELD_PAIRS.items():
             result[field] = data.get(field)
-        
-        # Add all evidence fields at the end
-        for evidence_field in EVIDENCE_FIELDS:
-            result[evidence_field] = data.get(evidence_field, '')
+            if evidence_field:
+                result[evidence_field] = data.get(evidence_field, '')
         
         return result
 
@@ -62,9 +60,8 @@ class ResumeProcessor:
         if all_results:
             df = pd.DataFrame(all_results)
             
-            # Reorder columns to put evidence at the end
-            cols = ['resume_file'] + ASSESSMENT_FIELDS + EVIDENCE_FIELDS
-            df = df[cols]
+            # Order columns with evidence next to assessments
+            df = df[get_ordered_columns()]
             
             df.to_csv(output_file, index=False)
             logger.info(f"Analysis complete. Results saved to {output_file}")

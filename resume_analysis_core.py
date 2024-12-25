@@ -140,7 +140,7 @@ class ResumeAnalysisResult(BaseModel):
 class ResumeAnalyzer:
     def __init__(self, api_key: Optional[str] = None):
         self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-        with open('resume-extractor-prompt.txt', 'r') as file:
+        with open('resume-extractor-prompt-draft.txt', 'r') as file:
             self.system_prompt = file.read()
         logger.debug("ResumeAnalyzer initialized")
 

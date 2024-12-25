@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Tuple
 
 # Define the order and relationships of fields
 FIELD_PAIRS: Dict[str, Optional[str]] = {
@@ -17,6 +17,17 @@ FIELD_PAIRS: Dict[str, Optional[str]] = {
     'risks': None,
     'highlights': None
 }
+
+def get_ordered_columns() -> List[str]:
+    """Get ordered list of columns with evidence fields next to their assessments."""
+    columns = ['resume_file']  # Start with resume_file
+    
+    for field, evidence_field in FIELD_PAIRS.items():
+        columns.append(field)
+        if evidence_field:
+            columns.append(evidence_field)
+    
+    return columns
 
 # Get all assessment fields (fields without _evidence suffix)
 ASSESSMENT_FIELDS = list(FIELD_PAIRS.keys())
