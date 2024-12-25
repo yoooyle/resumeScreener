@@ -1,148 +1,47 @@
 import os
 import sys
 import logging
-from typing import Optional, List, Union, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Optional, Union, Type
 from openai import OpenAI
 from pypdf import PdfReader
 from pathlib import Path
 from dotenv import load_dotenv
-import logging_config
-from field_config import FIELD_PAIRS, get_evidence_field
+from pydantic import BaseModel
+from roles import BaseRole, RoleRegistry
 
 # Load environment variables at module level
 load_dotenv()
 
-# Create logger for this module
-logger = logging.getLogger(__name__)
-
 # Verify API key is available
 if not os.getenv("OPENAI_API_KEY"):
     raise ValueError("OPENAI_API_KEY environment variable is not set. Please set it in your .env file.")
-class ResumeAnalysisResult(BaseModel):
-    # Basic Information
-    chinese_name: Optional[str] = Field(None, 
-        description="Chinese name from the resume")
-    expected_salary: Optional[str] = Field(None,
-        description="Expected salary if mentioned in the resume")
-    years_of_experience: Optional[str] = Field(None,
-        description="Years of experience in relevant IT roles")
 
-    # English Skills
-    english_proficiency: str = Field(
-        description=(
-            "English proficiency level (Proficient/OK/No signal). "
-            "Proficient: clear signals of using English as working language "
-            "(English resume, worked in English speaking firms, study abroad in English speaking countries, "
-            "English certifications like TOEFL/IELTS). "
-            "OK: signals of working with English docs, compliance frameworks, and tools. "
-            "No signal: no English exposure evidence."
-        ))
-    english_evidence: str = Field(
-        description="Evidence from resume supporting English proficiency assessment")
-
-    # Communication Skills
-    communication_skill: str = Field(
-        description=(
-            "Assessment of ability to work with diverse non-technical stakeholders "
-            "and translate business languages into technical solutions"
-        ))
-    communication_evidence: str = Field(
-        description="Evidence from resume supporting communication skill assessment")
-
-    # Technical Experience
-    us_saas_familiarity: str = Field(
-        description=(
-            "Familiarity with US SaaS (High/Low/No signal). "
-            "High: worked in companies using US SaaS like Slack, MSFT Team, Google Workspace, Jira. "
-            "Low: only worked with China (dealbreaker). "
-            "No signal: no clear indication."
-        ))
-    us_saas_evidence: str = Field(
-        description="Evidence from resume supporting US SaaS familiarity assessment")
-
-    technical_breadth: str = Field(
-        description=(
-            "Technical domain breadth (High/Medium/Low). "
-            "High: has Endpoint Management, IAM & SSO, VPN & Network, and more IT domains. "
-            "Medium: some of these domains. "
-            "Low: none of these domains."
-        ))
-    technical_breadth_evidence: str = Field(
-        description="Evidence from resume supporting technical breadth assessment")
-
-    architecture_capability: str = Field(
-        description=(
-            "Assessment of ability to think and design on system/architecture level "
-            "vs only implementing others' designs"
-        ))
-    architecture_evidence: str = Field(
-        description="Evidence from resume supporting architecture capability assessment")
-
-    # Operational Skills
-    it_operation: str = Field(
-        description=(
-            "Efficient IT operation capability (High/Medium/Low). "
-            "High: experience running help desk, building knowledge base, "
-            "automating with Python/AI/low-code tools. "
-            "Medium: some of these. Low: none of these."
-        ))
-    it_operation_evidence: str = Field(
-        description="Evidence from resume supporting IT operation assessment")
-
-    # Leadership and Personal Qualities
-    project_leadership: str = Field(
-        description=(
-            "Assessment of experience leading complex or long running projects "
-            "across team boundaries"
-        ))
-    leadership_evidence: str = Field(
-        description="Evidence from resume supporting project leadership assessment")
-
-    attention_to_detail: str = Field(
-        description="Assessment of candidate's attention to detail based on resume evidence")
-    attention_evidence: str = Field(
-        description="Evidence from resume supporting attention to detail assessment")
-
-    hungry_for_excellence: str = Field(
-        description=(
-            "Assessment of candidate's drive for excellence and hunger for success "
-            "based on resume evidence"
-        ))
-    excellence_evidence: str = Field(
-        description="Evidence from resume supporting excellence assessment")
-
-    # Overall Assessment
-    risks: Optional[str] = Field(None,
-        description="Potential risks and lowlights where the candidate may not qualify")
-    highlights: Optional[str] = Field(None,
-        description="Notable highlights and strengths that help the candidate stand out")
-
-    def format_output(self) -> Dict[str, Any]:
-        """Format the analysis result for readable output."""
-        formatted_result = {}
-        data = self.model_dump()
-        
-        # Add all assessment fields first
-        for field in FIELD_PAIRS:
-            value = data.get(field)
-            if value is not None:
-                field_result = {
-                    'assessment': value
-                }
-                evidence_field = get_evidence_field(field)
-                if evidence_field:
-                    field_result['evidence'] = data.get(evidence_field, '')
-                formatted_result[field] = field_result
-        
-        return formatted_result
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 class ResumeAnalyzer:
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, role: Union[str, BaseRole], api_key: Optional[str] = None):
+        """
+        Initialize the resume analyzer for a specific role.
+        
+        Args:
+            role: Either a role name string or a BaseRole instance
+            api_key: Optional OpenAI API key (defaults to environment variable)
+        """
         self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-        with open('resume-extractor-prompt-draft.txt', 'r') as file:
-            self.system_prompt = file.read()
-        logger.debug("ResumeAnalyzer initialized")
+        
+        # Get role configuration
+        if isinstance(role, str):
+            self.role = RoleRegistry.get_role(role)
+        elif isinstance(role, BaseRole):
+            self.role = role
+        else:
+            raise TypeError("role must be either a string or BaseRole instance")
+        
+        # Create the analysis model for this role
+        self.AnalysisModel = self.role.create_analysis_model()
+        
+        logger.debug(f"ResumeAnalyzer initialized for role: {self.role.role_name}")
 
     def extract_text_from_pdf(self, pdf_path: Union[str, Path]) -> str:
         """Extract text content from a PDF file."""
@@ -154,72 +53,70 @@ class ResumeAnalyzer:
         logger.debug(f"Extracted {len(text)} characters from PDF")
         return text
 
-    def analyze_resume_text(self, resume_text: str) -> ResumeAnalysisResult:
+    def analyze_resume_text(self, resume_text: str) -> BaseModel:
         """Analyze a single resume text and return structured results."""
         logger.debug("Starting resume text analysis")
         completion = self.client.beta.chat.completions.parse(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": self.system_prompt},
+                {"role": "system", "content": self.role.prompt_template},
                 {"role": "user", "content": f"Here is the resume text to analyze:\n\n{resume_text}"}
             ],
-            response_format=ResumeAnalysisResult
+            response_format=self.AnalysisModel
         )
-        
         logger.debug("Resume analysis completed")
         return completion.choices[0].message.parsed
 
-    def analyze_resume_file(self, file_path: Union[str, Path]) -> ResumeAnalysisResult:
+    def analyze_resume_file(self, file_path: Union[str, Path]) -> BaseModel:
         """Analyze a resume file (PDF) and return structured results."""
         logger.info(f"Analyzing resume file: {file_path}")
         text = self.extract_text_from_pdf(file_path)
         logger.debug("Extracted text from PDF, proceeding with analysis")
         return self.analyze_resume_text(text)
 
-def process_resume(file_path: str) -> Dict[str, Any]:
-    """Process a resume file and return structured analysis results."""
-    try:
-        logger.info(f"Starting resume analysis for: {file_path}")
-        analyzer = ResumeAnalyzer()
-        
-        if file_path.lower().endswith('.pdf'):
-            result = analyzer.analyze_resume_file(file_path)
-        else:
-            with open(file_path, 'r') as file:
-                resume_text = file.read()
-            result = analyzer.analyze_resume_text(resume_text)
-        
-        formatted_result = result.format_output()
-        logger.info("Resume analysis completed successfully")
-        return formatted_result
-        
-    except Exception as e:
-        logger.error(f"Error analyzing resume: {str(e)}", exc_info=True)
-        raise
+def process_resume(file_path: str, role: Union[str, BaseRole] = 'it_manager') -> dict:
+    """
+    Process a single resume file and return analysis results.
+    
+    Args:
+        file_path: Path to the resume PDF file
+        role: Role to analyze for (default: 'it_manager')
+    
+    Returns:
+        Dictionary containing the analysis results
+    """
+    analyzer = ResumeAnalyzer(role)
+    result = analyzer.analyze_resume_file(file_path)
+    return result.dict()
 
 def main():
     """Command-line interface for resume analysis."""
-    # Set debug level for CLI usage
-    logging_config.set_log_level(logging.DEBUG)
+    import argparse
     
-    if len(sys.argv) != 2:
-        logger.error("Invalid number of arguments")
-        print("Usage: python resume_analysis_core.py <resume_file>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Analyze a resume for a specific role")
+    parser.add_argument("resume_file", help="Path to the resume PDF file")
+    parser.add_argument("--role", "-r", default="it_manager",
+                       help=f"Role to analyze for. Available roles: {', '.join(RoleRegistry.available_roles())}")
+    
+    args = parser.parse_args()
     
     try:
-        result = process_resume(sys.argv[1])
+        result = process_resume(args.resume_file, args.role)
+        
+        # Print results in a readable format
         print("\nResume Analysis Results:")
         print("=" * 50)
-        
-        for field, data in result.items():
-            print(f"\n{field.replace('_', ' ').title()}")
-            print(f"Assessment: {data['assessment']}")
-            if 'evidence' in data:
-                print(f"Evidence: {data['evidence']}")
-                
+        for field, value in result.items():
+            if not field.endswith('_evidence'):
+                print(f"\n{field.replace('_', ' ').title()}:")
+                print(f"Assessment: {value}")
+                evidence_field = field + '_evidence'
+                evidence = result.get(evidence_field)
+                if evidence:
+                    print(f"Evidence: {evidence}")
+    
     except Exception as e:
-        logger.error(f"Error in main: {str(e)}", exc_info=True)
+        logger.error(f"Error analyzing resume: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

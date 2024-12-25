@@ -3,6 +3,7 @@ import sys
 import logging
 from resume_analyzer import ResumeProcessor
 from resume_scorer import score_resumes
+from roles import RoleRegistry
 import logging_config
 import pandas as pd
 from typing import Optional
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 def process_and_rank(
     directory_path: str, 
+    role: str = 'it_manager',
     output_prefix: str = "resume",
     force_rerun: bool = False
 ) -> Optional[pd.DataFrame]:
@@ -20,6 +22,7 @@ def process_and_rank(
     
     Args:
         directory_path: Path to directory containing PDF resumes
+        role: Role to analyze for (default: 'it_manager')
         output_prefix: Prefix for output files (default: "resume")
                       Will produce <prefix>_analysis.csv and <prefix>_ranked.csv
         force_rerun: If True, rerun all steps even if outputs exist
@@ -35,7 +38,7 @@ def process_and_rank(
         # Step 1: Analyze resumes
         if force_rerun or not os.path.exists(analysis_file):
             logger.info("Step 1: Analyzing resumes...")
-            processor = ResumeProcessor()
+            processor = ResumeProcessor(role)
             processor.process_directory(directory_path, analysis_file)
         else:
             logger.info(f"Using existing analysis file: {analysis_file}")
@@ -71,6 +74,13 @@ def process_and_rank(
                 print(f"Key Strengths: {str(row['highlights'])}")
             if pd.notna(row['risks']):
                 print(f"Risks: {str(row['risks'])}")
+            
+            # Print dimension scores
+            print("\nDimension Scores:")
+            for col in row.keys():
+                if col.endswith('_score') and col != 'total_score':
+                    score = float(row[col])
+                    print(f"- {col.replace('_score', '').replace('_', ' ').title()}: {score:.2f}")
         
         return df
         
@@ -84,6 +94,8 @@ def main():
     
     parser = argparse.ArgumentParser(description="Analyze and rank resumes from a directory")
     parser.add_argument("directory_path", help="Path to directory containing PDF resumes")
+    parser.add_argument("--role", "-r", default="it_manager",
+                       help=f"Role to analyze for. Available roles: {', '.join(RoleRegistry.available_roles())}")
     parser.add_argument("--force", "-f", action="store_true", 
                        help="Force rerun all steps even if outputs exist")
     parser.add_argument("--prefix", "-p", default="resume",
@@ -103,8 +115,16 @@ def main():
         logger.error(f"Path is not a directory: {args.directory_path}")
         sys.exit(1)
     
+    # Validate role
+    try:
+        RoleRegistry.get_role(args.role)
+    except ValueError as e:
+        logger.error(str(e))
+        sys.exit(1)
+    
     result = process_and_rank(
         args.directory_path,
+        role=args.role,
         output_prefix=args.prefix,
         force_rerun=args.force
     )
