@@ -7,7 +7,7 @@ This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract struct
 - PDF resume text extraction
 - Structured analysis using GPT-4o
 - Detailed evidence-based assessments
-- One-row-per-resume CSV output
+- One-row-per-resume CSV output with paired assessment-evidence columns
 - Configurable logging levels
 - Both CLI and API usage
 - Centralized field configuration
@@ -98,42 +98,28 @@ The program evaluates candidates on multiple dimensions, organized into categori
 
 ## Output Format
 
-The CSV output uses a one-row-per-resume format with:
+The CSV output uses a one-row-per-resume format with assessment and evidence columns paired together:
 
-1. Basic Information Columns:
-   - resume_file
-   - chinese_name
-   - expected_salary
-   - years_of_experience
+```csv
+resume_file, chinese_name, expected_salary, years_of_experience,
+english_proficiency, english_evidence,
+communication_skill, communication_evidence,
+us_saas_familiarity, us_saas_evidence,
+technical_breadth, technical_breadth_evidence,
+architecture_capability, architecture_evidence,
+it_operation, it_operation_evidence,
+project_leadership, leadership_evidence,
+attention_to_detail, attention_evidence,
+hungry_for_excellence, excellence_evidence,
+risks, highlights
+```
 
-2. Assessment Columns:
-   - english_proficiency
-   - communication_skill
-   - us_saas_familiarity
-   - technical_breadth
-   - architecture_capability
-   - it_operation
-   - project_leadership
-   - attention_to_detail
-   - hungry_for_excellence
-   - risks
-   - highlights
-
-3. Evidence Columns (at the end):
-   - english_evidence
-   - communication_evidence
-   - us_saas_evidence
-   - technical_breadth_evidence
-   - architecture_evidence
-   - it_operation_evidence
-   - leadership_evidence
-   - attention_evidence
-   - excellence_evidence
+Each assessment field is immediately followed by its corresponding evidence field (if any), making it easier to review the analysis results.
 
 ## Project Structure
 
 - `resume_analyzer.py`: Main script for batch processing directories
 - `resume_analysis_core.py`: Core analysis functionality and models
-- `field_config.py`: Centralized field configuration
+- `field_config.py`: Centralized field configuration and column ordering
 - `logging_config.py`: Shared logging configuration
-- `resume-extractor-prompt-draft.txt`: GPT analysis prompt 
+- `resume-extractor-prompt-draft.txt`: GPT analysis prompt
