@@ -73,14 +73,11 @@ def score_and_rank_resumes(input_file: str, output_file: str = "ranked_resumes.c
                 logger.error(f"Valid categories are: High, Medium, Low, No Signal")
                 return None
             
-            # Apply scoring
-            df[score_col] = df[dimension].map(score_mapping).fillna(0.0)
+            # Apply scoring (store as percentages)
+            df[score_col] = df[dimension].map(score_mapping).fillna(0.0) * 100
             
-            # Store raw scores for display (as percentages)
-            df[f"{dimension}_display"] = df[score_col] * 100
-            
-            # Add weighted contribution to total score
-            weighted_scores += df[score_col] * (weight / 100)
+            # Add weighted contribution to total score (convert back to 0-1 scale for weighting)
+            weighted_scores += (df[score_col] / 100) * (weight / 100)
         
         # Set total score (already on 100-point scale since weights sum to 100)
         df['total_score'] = weighted_scores * 100
@@ -146,9 +143,9 @@ def main():
         # Print dimension scores
         print("\nDimension Scores:")
         for dimension, weight in role.dimension_weights.items():
-            display_col = f"{dimension}_display"
-            if display_col in row:
-                score = float(row[display_col])
+            score_col = f"{dimension}_score"
+            if score_col in row:
+                score = float(row[score_col])
                 print(f"- {dimension.replace('_', ' ').title()} ({weight}%): {score:.1f}%")
 
 if __name__ == "__main__":

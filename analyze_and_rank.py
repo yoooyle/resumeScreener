@@ -150,7 +150,7 @@ def main():
                 print("\nDimension Scores:")
                 for col in row.keys():
                     if col.endswith('_score') and col != 'total_score':
-                        score = float(row[col]) * 100
+                        score = float(row[col]) 
                         print(f"- {col.replace('_score', '').replace('_', ' ').title()}: {score:.1f}%")
     
     except Exception as e:
