@@ -1,6 +1,6 @@
 # Resume Fact Extractor
 
-This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract structured information about candidates. It evaluates multiple dimensions including English proficiency, technical breadth, leadership experience, and more.
+This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract structured information about candidates, scores them based on multiple dimensions, and provides ranked results.
 
 ## Features
 
@@ -8,6 +8,7 @@ This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract struct
 - Structured analysis using GPT-4o
 - Detailed evidence-based assessments
 - One-row-per-resume CSV output with paired assessment-evidence columns
+- Automated scoring and ranking system
 - Configurable logging levels
 - Both CLI and API usage
 - Centralized field configuration
@@ -41,9 +42,19 @@ OPENAI_API_KEY=your_api_key_here
 python resume_analysis_core.py path/to/resume.pdf
 ```
 
-2. Process a directory of resumes:
+2. Process a directory of resumes (analysis only):
 ```bash
 python resume_analyzer.py /path/to/resume/directory
+```
+
+3. Score and rank analyzed resumes:
+```bash
+python resume_scorer.py resume_analysis.csv
+```
+
+4. Complete pipeline (analyze and rank in one step):
+```bash
+python analyze_and_rank.py /path/to/resume/directory
 ```
 
 ### Python API
@@ -57,6 +68,10 @@ result = process_resume("path/to/resume.pdf")
 from resume_analyzer import ResumeProcessor
 processor = ResumeProcessor()
 processor.process_directory("/path/to/resume/directory")
+
+# Process and rank resumes
+from analyze_and_rank import process_and_rank
+process_and_rank("/path/to/resume/directory", output_prefix="custom_name")
 ```
 
 ### Logging Configuration
@@ -98,7 +113,8 @@ The program evaluates candidates on multiple dimensions, organized into categori
 
 ## Output Format
 
-The CSV output uses a one-row-per-resume format with assessment and evidence columns paired together:
+### Initial Analysis CSV
+The first-stage output uses a one-row-per-resume format with assessment and evidence columns paired together:
 
 ```csv
 resume_file, chinese_name, expected_salary, years_of_experience,
@@ -114,12 +130,47 @@ hungry_for_excellence, excellence_evidence,
 risks, highlights
 ```
 
-Each assessment field is immediately followed by its corresponding evidence field (if any), making it easier to review the analysis results.
+### Ranked Results CSV
+The second-stage output adds scoring columns and ranks candidates:
+
+```csv
+rank, total_score, dimension1_score, dimension2_score, ..., [all columns from initial analysis]
+```
+
+## Scoring System
+
+The scoring system evaluates candidates using a weighted combination of dimensions:
+
+### Dimension Weights (Total: 100)
+- English Proficiency (15%): Critical for global team communication
+- US SaaS Familiarity (15%): Critical for tool adoption
+- Technical Breadth (15%): Important for IT role coverage
+- IT Operations (12%): Core job requirement
+- Architecture Capability (10%): Important for system design
+- Project Leadership (10%): Important for team impact
+- Communication Skills (8%): Important for stakeholder management
+- Drive for Excellence (8%): Important for growth
+- Attention to Detail (7%): Good to have
+
+### Scoring Adjustments
+- Risk Penalty: Up to 20% reduction based on number of risk factors
+- Highlight Bonus: Up to 10% increase based on number of notable strengths
+
+### Usage
+```bash
+# First generate the analysis CSV
+python resume_analyzer.py /path/to/resume/directory
+
+# Then generate ranked results
+python resume_scorer.py resume_analysis.csv
+```
 
 ## Project Structure
 
 - `resume_analyzer.py`: Main script for batch processing directories
 - `resume_analysis_core.py`: Core analysis functionality and models
+- `resume_scorer.py`: Scoring and ranking system
+- `analyze_and_rank.py`: Combined analysis and ranking pipeline
 - `field_config.py`: Centralized field configuration and column ordering
 - `logging_config.py`: Shared logging configuration
 - `resume-extractor-prompt-draft.txt`: GPT analysis prompt
