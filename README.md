@@ -7,9 +7,10 @@ This Python program analyzes PDF resumes using OpenAI's GPT-4o to extract struct
 - PDF resume text extraction
 - Structured analysis using GPT-4o
 - Detailed evidence-based assessments
-- CSV output for easy analysis
+- One-row-per-resume CSV output
 - Configurable logging levels
 - Both CLI and API usage
+- Centralized field configuration
 
 ## Setup
 
@@ -42,8 +43,7 @@ python resume_analysis_core.py path/to/resume.pdf
 
 2. Process a directory of resumes:
 ```bash
-python resume_analyzer.py
-# When prompted, enter the directory path containing the PDF resumes
+python resume_analyzer.py /path/to/resume/directory
 ```
 
 ### Python API
@@ -56,7 +56,7 @@ result = process_resume("path/to/resume.pdf")
 # Process multiple resumes
 from resume_analyzer import ResumeProcessor
 processor = ResumeProcessor()
-processor.process_directory("path/to/resume/directory")
+processor.process_directory("/path/to/resume/directory")
 ```
 
 ### Logging Configuration
@@ -72,27 +72,68 @@ logging_config.set_log_level(logging.INFO)   # For normal operation
 
 ## Analysis Dimensions
 
-The program evaluates candidates on multiple dimensions:
+The program evaluates candidates on multiple dimensions, organized into categories:
 
-- Chinese Name & Expected Salary
+### Basic Information
+- Chinese Name
+- Expected Salary
 - Years of Experience
+
+### Skills Assessment
 - English Proficiency (Proficient/OK/No signal)
 - Communication Skills
 - US SaaS Familiarity (High/Low/No signal)
 - Technical Domain Breadth (High/Medium/Low)
 - Architecture Capabilities
 - IT Operations Efficiency
+
+### Personal Qualities
 - Project Leadership
 - Attention to Detail
 - Drive for Excellence
-- Risks and Highlights
+
+### Overall Assessment
+- Risks and Lowlights
+- Notable Highlights
 
 ## Output Format
 
-The CSV output contains the following columns:
-- resume_file: Name of the source PDF file
-- dimension: The aspect being evaluated
-- assessment: The evaluation result
-- evidence: Supporting text from the resume
+The CSV output uses a one-row-per-resume format with:
 
-Each dimension includes both an assessment and supporting evidence from the resume text. 
+1. Basic Information Columns:
+   - resume_file
+   - chinese_name
+   - expected_salary
+   - years_of_experience
+
+2. Assessment Columns:
+   - english_proficiency
+   - communication_skill
+   - us_saas_familiarity
+   - technical_breadth
+   - architecture_capability
+   - it_operation
+   - project_leadership
+   - attention_to_detail
+   - hungry_for_excellence
+   - risks
+   - highlights
+
+3. Evidence Columns (at the end):
+   - english_evidence
+   - communication_evidence
+   - us_saas_evidence
+   - technical_breadth_evidence
+   - architecture_evidence
+   - it_operation_evidence
+   - leadership_evidence
+   - attention_evidence
+   - excellence_evidence
+
+## Project Structure
+
+- `resume_analyzer.py`: Main script for batch processing directories
+- `resume_analysis_core.py`: Core analysis functionality and models
+- `field_config.py`: Centralized field configuration
+- `logging_config.py`: Shared logging configuration
+- `resume-extractor-prompt-draft.txt`: GPT analysis prompt 

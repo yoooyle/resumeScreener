@@ -8,6 +8,7 @@ from pypdf import PdfReader
 from pathlib import Path
 from dotenv import load_dotenv
 import logging_config
+from field_config import FIELD_PAIRS, get_evidence_field
 
 # Load environment variables at module level
 load_dotenv()
@@ -18,59 +19,118 @@ logger = logging.getLogger(__name__)
 # Verify API key is available
 if not os.getenv("OPENAI_API_KEY"):
     raise ValueError("OPENAI_API_KEY environment variable is not set. Please set it in your .env file.")
-
 class ResumeAnalysisResult(BaseModel):
-    chinese_name: Optional[str] = Field(None, description="Chinese name from the resume")
-    expected_salary: Optional[str] = Field(None, description="Expected salary if mentioned in the resume")
-    years_of_experience: Optional[str] = Field(None, description="Years of experience in relevant IT roles")
-    english_proficiency: str = Field(description="English proficiency level (Proficient/OK/No signal). Proficient: clear signals of using English as working language (English resume, worked in English speaking firms, study abroad in English speaking countries, English certifications like TOEFL/IELTS). OK: signals of working with English docs, compliance frameworks, and tools. No signal: no English exposure evidence.")
-    english_evidence: str = Field(description="Evidence from resume supporting English proficiency assessment")
-    communication_skill: str = Field(description="Assessment of ability to work with diverse non-technical stakeholders and translate business languages into technical solutions")
-    communication_evidence: str = Field(description="Evidence from resume supporting communication skill assessment")
-    us_saas_familiarity: str = Field(description="Familiarity with US SaaS (High/Low/No signal). High: worked in companies using US SaaS like Slack, MSFT Team, Google Workspace, Jira. Low: only worked with China (dealbreaker). No signal: no clear indication.")
-    us_saas_evidence: str = Field(description="Evidence from resume supporting US SaaS familiarity assessment")
-    technical_breadth: str = Field(description="Technical domain breadth (High/Medium/Low). High: has Endpoint Management, IAM & SSO, VPN & Network, and more IT domains. Medium: some of these domains. Low: none of these domains.")
-    technical_breadth_evidence: str = Field(description="Evidence from resume supporting technical breadth assessment")
-    architecture_capability: str = Field(description="Assessment of ability to think and design on system/architecture level vs only implementing others' designs")
-    architecture_evidence: str = Field(description="Evidence from resume supporting architecture capability assessment")
-    it_operation: str = Field(description="Efficient IT operation capability (High/Medium/Low). High: experience running help desk, building knowledge base, automating with Python/AI/low-code tools. Medium: some of these. Low: none of these.")
-    it_operation_evidence: str = Field(description="Evidence from resume supporting IT operation assessment")
-    project_leadership: str = Field(description="Assessment of experience leading complex or long running projects across team boundaries")
-    leadership_evidence: str = Field(description="Evidence from resume supporting project leadership assessment")
-    attention_to_detail: str = Field(description="Assessment of candidate's attention to detail based on resume evidence")
-    attention_evidence: str = Field(description="Evidence from resume supporting attention to detail assessment")
-    hungry_for_excellence: str = Field(description="Assessment of candidate's drive for excellence and hunger for success based on resume evidence")
-    excellence_evidence: str = Field(description="Evidence from resume supporting excellence assessment")
-    risks: Optional[str] = Field(None, description="Potential risks and lowlights where the candidate may not qualify")
-    highlights: Optional[str] = Field(None, description="Notable highlights and strengths that help the candidate stand out")
+    # Basic Information
+    chinese_name: Optional[str] = Field(None, 
+        description="Chinese name from the resume")
+    expected_salary: Optional[str] = Field(None,
+        description="Expected salary if mentioned in the resume")
+    years_of_experience: Optional[str] = Field(None,
+        description="Years of experience in relevant IT roles")
+
+    # English Skills
+    english_proficiency: str = Field(
+        description=(
+            "English proficiency level (Proficient/OK/No signal). "
+            "Proficient: clear signals of using English as working language "
+            "(English resume, worked in English speaking firms, study abroad in English speaking countries, "
+            "English certifications like TOEFL/IELTS). "
+            "OK: signals of working with English docs, compliance frameworks, and tools. "
+            "No signal: no English exposure evidence."
+        ))
+    english_evidence: str = Field(
+        description="Evidence from resume supporting English proficiency assessment")
+
+    # Communication Skills
+    communication_skill: str = Field(
+        description=(
+            "Assessment of ability to work with diverse non-technical stakeholders "
+            "and translate business languages into technical solutions"
+        ))
+    communication_evidence: str = Field(
+        description="Evidence from resume supporting communication skill assessment")
+
+    # Technical Experience
+    us_saas_familiarity: str = Field(
+        description=(
+            "Familiarity with US SaaS (High/Low/No signal). "
+            "High: worked in companies using US SaaS like Slack, MSFT Team, Google Workspace, Jira. "
+            "Low: only worked with China (dealbreaker). "
+            "No signal: no clear indication."
+        ))
+    us_saas_evidence: str = Field(
+        description="Evidence from resume supporting US SaaS familiarity assessment")
+
+    technical_breadth: str = Field(
+        description=(
+            "Technical domain breadth (High/Medium/Low). "
+            "High: has Endpoint Management, IAM & SSO, VPN & Network, and more IT domains. "
+            "Medium: some of these domains. "
+            "Low: none of these domains."
+        ))
+    technical_breadth_evidence: str = Field(
+        description="Evidence from resume supporting technical breadth assessment")
+
+    architecture_capability: str = Field(
+        description=(
+            "Assessment of ability to think and design on system/architecture level "
+            "vs only implementing others' designs"
+        ))
+    architecture_evidence: str = Field(
+        description="Evidence from resume supporting architecture capability assessment")
+
+    # Operational Skills
+    it_operation: str = Field(
+        description=(
+            "Efficient IT operation capability (High/Medium/Low). "
+            "High: experience running help desk, building knowledge base, "
+            "automating with Python/AI/low-code tools. "
+            "Medium: some of these. Low: none of these."
+        ))
+    it_operation_evidence: str = Field(
+        description="Evidence from resume supporting IT operation assessment")
+
+    # Leadership and Personal Qualities
+    project_leadership: str = Field(
+        description=(
+            "Assessment of experience leading complex or long running projects "
+            "across team boundaries"
+        ))
+    leadership_evidence: str = Field(
+        description="Evidence from resume supporting project leadership assessment")
+
+    attention_to_detail: str = Field(
+        description="Assessment of candidate's attention to detail based on resume evidence")
+    attention_evidence: str = Field(
+        description="Evidence from resume supporting attention to detail assessment")
+
+    hungry_for_excellence: str = Field(
+        description=(
+            "Assessment of candidate's drive for excellence and hunger for success "
+            "based on resume evidence"
+        ))
+    excellence_evidence: str = Field(
+        description="Evidence from resume supporting excellence assessment")
+
+    # Overall Assessment
+    risks: Optional[str] = Field(None,
+        description="Potential risks and lowlights where the candidate may not qualify")
+    highlights: Optional[str] = Field(None,
+        description="Notable highlights and strengths that help the candidate stand out")
 
     def format_output(self) -> Dict[str, Any]:
         """Format the analysis result for readable output."""
-        field_pairs = {
-            'chinese_name': None,
-            'expected_salary': None,
-            'years_of_experience': None,
-            'english_proficiency': 'english_evidence',
-            'communication_skill': 'communication_evidence',
-            'us_saas_familiarity': 'us_saas_evidence',
-            'technical_breadth': 'technical_breadth_evidence',
-            'architecture_capability': 'architecture_evidence',
-            'it_operation': 'it_operation_evidence',
-            'project_leadership': 'leadership_evidence',
-            'attention_to_detail': 'attention_evidence',
-            'hungry_for_excellence': 'excellence_evidence',
-            'risks': None,
-            'highlights': None
-        }
-        
         formatted_result = {}
         data = self.model_dump()
-        for field, evidence_field in field_pairs.items():
+        
+        # Add all assessment fields first
+        for field in FIELD_PAIRS:
             value = data.get(field)
             if value is not None:
                 field_result = {
                     'assessment': value
                 }
+                evidence_field = get_evidence_field(field)
                 if evidence_field:
                     field_result['evidence'] = data.get(evidence_field, '')
                 formatted_result[field] = field_result
