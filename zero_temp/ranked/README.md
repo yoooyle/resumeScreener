@@ -1,4 +1,3 @@
-
 Analyzing 3 ranking files:
 - resume_ranked-2.csv
 - resume_ranked-3.csv
@@ -42,3 +41,21 @@ p-value: 0.000
 
 Interpretation of Kendall's W:
 Very strong agreement between all rankings
+
+# Summary of Results
+
+The analysis reveals high consistency across different ranking runs:
+
+1. **Top-K Overlap**:
+   - For top-5: There's an 80% overlap between all pairs of rankings (4 out of 5 resumes are the same)
+   - For top-10: There's a perfect 100% overlap between all pairs (all 10 resumes are the same)
+
+2. **Kendall's Tau**:
+   - All pairs show very strong correlations (τ > 0.85)
+   - All correlations are statistically significant (p < 0.05)
+
+3. **Kendall's W**:
+   - Shows very strong agreement (W = 0.976) between all rankings
+   - The result is statistically significant (p < 0.05)
+
+This suggests that the ranking system is producing highly consistent results, especially for the top candidates. The perfect overlap in the top-10 candidates across all runs indicates particularly strong reliability for identifying the best matches.
