@@ -114,7 +114,8 @@ class AIResumeExtractor:
                 {"role": "system", "content": self.role.prompt_template},
                 {"role": "user", "content": f"Here is the resume text to analyze:\n\n{resume_text}"}
             ],
-            response_format=self.AnalysisModel
+            response_format=self.AnalysisModel,
+            temperature=0
         )
         logger.debug("Dimension extraction completed")
         return completion.choices[0].message.parsed
